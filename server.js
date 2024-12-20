@@ -9,9 +9,16 @@ const users = {};
 // In-memory session store
 const sessions = {}; // Store session tokens and associated usernames
 
+// Token expiration time in milliseconds (e.g., 1 hour)
+const TOKEN_EXPIRATION_TIME = 60 * 60 * 1000; // 1 hour
+
 // Generate a simple token (for demonstration purposes)
 function generateToken(username) {
-    return Buffer.from(username + Date.now()).toString('base64'); // Simple token generation
+    const tokenData = {
+        username,
+        createdAt: Date.now(), // Store the creation time
+    };
+    return Buffer.from(JSON.stringify(tokenData)).toString('base64'); // Encode as Base64
 }
 
 // Function to hash passwords
@@ -31,6 +38,13 @@ function parseCookies(cookieHeader) {
         });
     }
     return cookies;
+}
+
+// Function to check if a token is expired
+function isTokenExpired(token) {
+    const decodedToken = JSON.parse(Buffer.from(token, 'base64').toString());
+    const currentTime = Date.now();
+    return (currentTime - decodedToken.createdAt) > TOKEN_EXPIRATION_TIME;
 }
 
 // Create the server
@@ -105,9 +119,9 @@ const server = http.createServer((req, res) => {
         const cookies = parseCookies(req.headers.cookie);
         const token = cookies.sessionToken;
 
-        if (!token || !sessions[token]) {
+        if (!token || !sessions[token] || isTokenExpired(token)) {
             res.writeHead(401, { 'Content-Type': 'text/plain' });
-            return res.end('Unauthorized access. Please log in.');
+            return res.end('Unauthorized access. Please log in or your session has expired.');
         }
 
         const username = sessions[token];
